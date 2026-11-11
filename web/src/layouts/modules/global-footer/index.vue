@@ -6,7 +6,7 @@ defineOptions({
 
 <template>
   <DarkModeContainer class="h-full flex-center">
-
+    <div></div>
   </DarkModeContainer>
 </template>
 
