@@ -1,4 +1,71 @@
+import { teamNameZh } from '@/constants/team-names';
 import type { MatchRow } from '@/service/api/football';
+
+function teamNameKey(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '');
+}
+
+const normalizedTeamNameZh: Record<string, string> = Object.fromEntries(
+  Object.entries(teamNameZh).map(([name, label]) => [teamNameKey(name), label])
+);
+
+/** 队名统一展示为中文；已是中文或未收录时原样返回 */
+export function displayTeamName(value?: string | null): string {
+  const name = String(value ?? '').trim();
+  if (!name) return '';
+  return teamNameZh[name] ?? normalizedTeamNameZh[teamNameKey(name)] ?? name;
+}
+
+/** 搜索文本同时包含英文原名与中文队名，便于两种关键字检索 */
+export function teamSearchText(...values: (string | null | undefined)[]): string {
+  return values.map(value => `${String(value ?? '')} ${displayTeamName(value)}`).join(' ');
+}
+
+const matchFieldLabels: Record<string, string> = {
+  Div: '联赛代码',
+  Date: '比赛日期',
+  Time: '开赛时间',
+  HomeTeam: '主队',
+  AwayTeam: '客队',
+  FTHG: '全场主队进球',
+  FTAG: '全场客队进球',
+  FTR: '全场赛果',
+  HTHG: '半场主队进球',
+  HTAG: '半场客队进球',
+  HTR: '半场赛果',
+  Referee: '主裁判',
+  HxG: '主队预期进球',
+  AxG: '客队预期进球',
+  HS: '主队射门',
+  AS: '客队射门',
+  HST: '主队射正',
+  AST: '客队射正',
+  HF: '主队犯规',
+  AF: '客队犯规',
+  HC: '主队角球',
+  AC: '客队角球',
+  HY: '主队黄牌',
+  AY: '客队黄牌',
+  HR: '主队红牌',
+  AR: '客队红牌',
+  AHh: '亚洲让球盘口',
+  AHCh: '收盘亚洲让球盘口'
+};
+
+const matchResultLabels: Record<string, string> = { H: '主胜', D: '平局', A: '客胜' };
+
+/** 比赛详情中的字段名统一为中文说明 */
+export function displayMatchFieldLabel(key: string): string {
+  return matchFieldLabels[key] ?? `赔率指标 ${key}`;
+}
+
+/** 比赛详情中的队名、赛果与日期统一为中文展示 */
+export function displayMatchFieldValue(key: string, value?: string): string {
+  if (key === 'HomeTeam' || key === 'AwayTeam') return displayTeamName(value) || '-';
+  if (key === 'FTR' || key === 'HTR') return matchResultLabels[value ?? ''] ?? value ?? '-';
+  if (key === 'Date') return displayDate(value);
+  return value || '-';
+}
 
 export interface MatchSummary {
   games: number;

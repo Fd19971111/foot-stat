@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { NEmpty, NSelect, NSpin } from 'naive-ui';
 import { useFootballData } from '@/hooks/business/useFootballData';
-import { displayDate, sortMatchesNewest, summarizeMatches } from '@/utils/football';
+import { displayDate, displayTeamName, sortMatchesNewest, summarizeMatches, teamSearchText } from '@/utils/football';
 
 defineOptions({ name: 'MatchResults' });
 
@@ -14,7 +14,7 @@ const filteredRows = computed(() => {
   const keyword = search.value.trim().toLocaleLowerCase();
   return sortMatchesNewest(rows.value.filter(row => {
     const settled = ['H', 'D', 'A'].includes(row.FTR);
-    const hasKeyword = !keyword || `${row.HomeTeam} ${row.AwayTeam} ${row.Date}`.toLocaleLowerCase().includes(keyword);
+    const hasKeyword = !keyword || `${teamSearchText(row.HomeTeam, row.AwayTeam)} ${row.Date}`.toLocaleLowerCase().includes(keyword);
     return hasKeyword && (!onlySettled.value || settled);
   }));
 });
@@ -26,7 +26,7 @@ const resultClass: Record<string, string> = { H: 'fw-result-home', D: 'fw-result
 <template>
   <div class="football-workspace">
     <header class="fw-heading">
-      <div><span class="fw-eyebrow">Football / Results</span><h2>赛果记录</h2><p>逐场核对已结束比赛的全场比分和技术统计。</p></div>
+      <div><span class="fw-eyebrow">足球 / 赛果记录</span><h2>赛果记录</h2><p>逐场核对已结束比赛的全场比分和技术统计。</p></div>
       <div class="fw-heading-actions">
         <label class="fw-field">赛季<NSelect v-model:value="season" :options="seasonOptions" /></label>
         <label class="fw-field">联赛<NSelect v-model:value="league" :options="leagueOptions" /></label>
@@ -56,9 +56,9 @@ const resultClass: Record<string, string> = { H: 'fw-result-home', D: 'fw-result
             <tbody>
               <tr v-for="(row, index) in filteredRows" :key="`${row.Date}-${row.HomeTeam}-${index}`">
                 <td>{{ displayDate(row.Date) }}<small v-if="row.Time"> {{ row.Time }}</small></td>
-                <td><strong>{{ row.HomeTeam }}</strong></td>
+                <td><strong>{{ displayTeamName(row.HomeTeam) }}</strong></td>
                 <td><strong>{{ row.FTHG || '-' }} : {{ row.FTAG || '-' }}</strong></td>
-                <td><strong>{{ row.AwayTeam }}</strong></td>
+                <td><strong>{{ displayTeamName(row.AwayTeam) }}</strong></td>
                 <td><span class="fw-tag" :class="resultClass[row.FTR] ?? 'fw-result-pending'">{{ resultLabel[row.FTR] ?? '未完赛' }}</span></td>
                 <td>{{ row.HS || '-' }} : {{ row.AS || '-' }}</td>
                 <td>{{ row.HST || '-' }} : {{ row.AST || '-' }}</td>

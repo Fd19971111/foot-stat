@@ -179,7 +179,7 @@ function exportAnalysis() {
 <template>
   <div class="football-workspace">
     <header class="fw-heading">
-      <div><span class="fw-eyebrow">Football / Analysis</span><h2>数据分析</h2><p>按年份聚合本地完赛记录，查看联赛赛果和比赛指标变化。</p></div>
+      <div><span class="fw-eyebrow">足球 / 数据分析</span><h2>数据分析</h2><p>按年份聚合本地完赛记录，查看联赛赛果和比赛指标变化。</p></div>
       <div class="fw-heading-actions">
         <label class="fw-field">赛季<NSelect v-model:value="season" :options="seasonOptions" /></label>
         <label class="fw-field">联赛<NSelect v-model:value="league" :options="leagueOptions" /></label>

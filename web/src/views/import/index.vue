@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import * as XLSX from 'xlsx';
 import { createFootballImport, fetchFootballImportDetails, fetchFootballImports, fetchFootballRemoteMatches } from '@/service/api/football';
 import type { ImportBatch, ImportMatch, MatchPrediction } from '@/service/api/football';
+import { displayTeamName } from '@/utils/football';
 
 defineOptions({ name: 'FootballImport' });
 
@@ -182,7 +183,7 @@ onMounted(loadBatches);
 <template>
   <div class="football-workspace">
     <header class="fw-heading">
-      <div><span class="fw-eyebrow">Football / Import</span><h2>比赛导入</h2><p>一键拉取中国竞彩网在售赛程，核对后导入并生成分析结果。</p></div>
+      <div><span class="fw-eyebrow">足球 / 比赛导入</span><h2>比赛导入</h2><p>一键拉取中国竞彩网在售赛程，核对后导入并生成分析结果。</p></div>
       <div class="fw-heading-actions"><button class="fw-button primary" :disabled="fetching" @click="fetchRemoteMatches">{{ fetching ? '正在获取…' : '从竞彩网获取' }}</button><button class="fw-button" @click="downloadTemplate">下载导入模板</button></div>
     </header>
 
@@ -211,7 +212,7 @@ onMounted(loadBatches);
           <thead><tr><th>比赛</th><th>日期</th><th>开赛时间</th><th>联赛</th></tr></thead>
           <tbody>
             <tr v-for="(match, index) in matches" :key="`${match.date}-${match.homeTeam}-${index}`">
-              <td><strong>{{ match.homeTeam }} vs {{ match.awayTeam }}</strong></td>
+              <td><strong>{{ displayTeamName(match.homeTeam) }} 对 {{ displayTeamName(match.awayTeam) }}</strong></td>
               <td>{{ match.date }}</td>
               <td>{{ match.time || '-' }}</td>
               <td>{{ match.league }}</td>
@@ -225,7 +226,7 @@ onMounted(loadBatches);
       <div class="fw-panel-head"><div><h3>自动预测报告</h3><p>{{ activeBatch.fileName }} · {{ predictions.length }} 场 · Poisson 历史统计</p></div><div class="fw-filters"><span class="fw-tag">预测仅供数据分析参考</span><RouterLink class="fw-link-button" to="/analysis">查看完整分析</RouterLink></div></div>
       <div class="fw-table-wrap"><table class="fw-table"><thead><tr><th>比赛</th><th>最可能比分</th><th>预期进球</th><th>综合概率</th><th>大 2.5 球</th><th>数据依据</th></tr></thead><tbody>
         <tr v-for="(prediction, index) in predictions" :key="`${prediction.matchDate}-${prediction.homeTeam}-${index}`">
-          <td><strong>{{ prediction.homeTeam }} - {{ prediction.awayTeam }}</strong><small>{{ prediction.matchDate }} {{ prediction.kickoffTime }} · {{ prediction.league }}</small></td>
+          <td><strong>{{ displayTeamName(prediction.homeTeam) }} - {{ displayTeamName(prediction.awayTeam) }}</strong><small>{{ prediction.matchDate }} {{ prediction.kickoffTime }} · {{ prediction.league }}</small></td>
           <td><strong>{{ prediction.predictedScore }}</strong></td>
           <td>{{ prediction.expectedHomeGoals.toFixed(2) }} - {{ prediction.expectedAwayGoals.toFixed(2) }}</td>
           <td>

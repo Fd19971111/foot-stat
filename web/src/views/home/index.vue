@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { computed, h, ref } from 'vue';
 import { NDrawer, NDrawerContent, NEmpty, NSelect, NSpin, NTag } from 'naive-ui';
-import { displayDate, sortMatchesNewest, summarizeMatches } from '@/utils/football';
+import {
+  displayDate,
+  displayMatchFieldLabel,
+  displayMatchFieldValue,
+  displayTeamName,
+  sortMatchesNewest,
+  summarizeMatches,
+  teamSearchText
+} from '@/utils/football';
 import type { MatchRow } from '@/service/api/football';
 import { useFootballData } from '@/hooks/business/useFootballData';
 
@@ -14,7 +22,7 @@ const summary = computed(() => summarizeMatches(rows.value));
 const filteredRows = computed(() => {
   const keyword = search.value.trim().toLocaleLowerCase();
   const matches = keyword
-    ? rows.value.filter(row => `${row.HomeTeam} ${row.AwayTeam} ${row.Date}`.toLocaleLowerCase().includes(keyword))
+    ? rows.value.filter(row => `${teamSearchText(row.HomeTeam, row.AwayTeam)} ${row.Date}`.toLocaleLowerCase().includes(keyword))
     : rows.value;
   return sortMatchesNewest(matches).slice(0, 12);
 });
@@ -41,7 +49,7 @@ function handleDrawerVisibility(visible: boolean) {
   <div class="football-workspace">
     <header class="fw-heading">
       <div>
-        <span class="fw-eyebrow">Football / Match Center</span>
+        <span class="fw-eyebrow">足球 / 比赛中心</span>
         <h2>比赛中心</h2>
         <p>从本地赛季数据快速查看赛果、进球、角球和牌数。</p>
       </div>
@@ -135,9 +143,9 @@ function handleDrawerVisibility(visible: boolean) {
               <span>{{ leagueOptions.find(item => item.value === league)?.label ?? league }}</span>
             </div>
             <div class="fw-match-teams">
-              <strong>{{ row.HomeTeam }}</strong>
+              <strong>{{ displayTeamName(row.HomeTeam) }}</strong>
               <b class="fw-score-pill">{{ row.FTHG || '-' }} : {{ row.FTAG || '-' }}</b>
-              <strong>{{ row.AwayTeam }}</strong>
+              <strong>{{ displayTeamName(row.AwayTeam) }}</strong>
             </div>
             <div class="fw-summary-line">
               <NTag size="small" :bordered="false" :type="resultInfo[row.FTR]?.type ?? 'default'">
@@ -154,15 +162,15 @@ function handleDrawerVisibility(visible: boolean) {
     </section>
 
     <NDrawer :show="Boolean(selected)" :width="520" placement="right" @update:show="handleDrawerVisibility">
-      <NDrawerContent v-if="selected" :title="`${selected.HomeTeam} vs ${selected.AwayTeam}`" closable>
+      <NDrawerContent v-if="selected" :title="`${displayTeamName(selected.HomeTeam)} 对 ${displayTeamName(selected.AwayTeam)}`" closable>
         <p class="fw-panel-head">
           {{ displayDate(selected.Date) }} {{ selected.Time }} ·
           {{ leagueOptions.find(item => item.value === league)?.label ?? league }}
         </p>
         <div class="fw-drawer-grid">
           <div v-for="(value, key) in selected" :key="key" class="fw-drawer-item">
-            <span>{{ key }}</span>
-            <strong>{{ value || '-' }}</strong>
+            <span>{{ displayMatchFieldLabel(String(key)) }}</span>
+            <strong>{{ displayMatchFieldValue(String(key), value) }}</strong>
           </div>
         </div>
       </NDrawerContent>

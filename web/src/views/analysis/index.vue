@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { NDrawer, NDrawerContent, NEmpty, NSelect, NSpin } from 'naive-ui';
 import { fetchFootballAnalysis, fetchFootballImports } from '@/service/api/football';
 import type { AnalysisProbability, AnalysisSummary, ImportBatch, MatchAnalysis } from '@/service/api/football';
-import { displayDate, downloadCsv } from '@/utils/football';
+import { displayDate, displayTeamName, downloadCsv, teamSearchText } from '@/utils/football';
 
 defineOptions({ name: 'AnalysisResults' });
 
@@ -27,7 +27,7 @@ const confidenceOptions = [
 const filteredMatches = computed(() => {
   const keyword = search.value.trim().toLocaleLowerCase();
   return matches.value.filter(item => {
-    const hasKeyword = !keyword || `${item.homeTeam} ${item.awayTeam} ${item.league}`.toLocaleLowerCase().includes(keyword);
+    const hasKeyword = !keyword || `${teamSearchText(item.homeTeam, item.awayTeam)} ${item.league}`.toLocaleLowerCase().includes(keyword);
     const hasConfidence = confidenceFilter.value === 'all' || item.confidenceLevel === confidenceFilter.value;
     return hasKeyword && hasConfidence;
   });
@@ -108,8 +108,8 @@ function exportAnalysis() {
       displayDate(item.matchDate),
       item.kickoffTime,
       item.league,
-      item.homeTeam,
-      item.awayTeam,
+      displayTeamName(item.homeTeam),
+      displayTeamName(item.awayTeam),
       item.recommendation,
       item.predictedScore,
       item.final.homeWin.toFixed(1),
@@ -139,7 +139,7 @@ onMounted(loadBatches);
   <div class="football-workspace">
     <header class="fw-heading">
       <div>
-        <span class="fw-eyebrow">Football / Prediction</span>
+        <span class="fw-eyebrow">足球 / 分析结果</span>
         <h2>分析结果</h2>
         <p>用 Dixon-Coles 泊松模型、Elo 等级分和近期状态，对导入的比赛给出综合判断。</p>
       </div>
@@ -187,7 +187,7 @@ onMounted(loadBatches);
               <tbody>
                 <tr v-for="(item, index) in filteredMatches" :key="`${item.matchDate}-${item.homeTeam}-${index}`">
                   <td>
-                    <strong>{{ item.homeTeam }} vs {{ item.awayTeam }}</strong>
+                    <strong>{{ displayTeamName(item.homeTeam) }} 对 {{ displayTeamName(item.awayTeam) }}</strong>
                     <small class="fw-cell-sub">{{ displayDate(item.matchDate) }} {{ item.kickoffTime }} · {{ item.league }}</small>
                   </td>
                   <td>
@@ -232,7 +232,7 @@ onMounted(loadBatches);
     </section>
 
     <NDrawer :show="Boolean(selected)" :width="560" placement="right" @update:show="visible => { if (!visible) selected = null; }">
-      <NDrawerContent v-if="selected" :title="`${selected.homeTeam} vs ${selected.awayTeam}`" closable>
+      <NDrawerContent v-if="selected" :title="`${displayTeamName(selected.homeTeam)} 对 ${displayTeamName(selected.awayTeam)}`" closable>
         <div class="fw-drawer-content">
           <div class="fw-verdict">
             <div><span>综合推荐</span><strong class="fw-advice" :class="adviceClass[selected.recommendationType]">{{ selected.recommendation }}</strong></div>
@@ -268,10 +268,10 @@ onMounted(loadBatches);
           <h4 class="fw-drawer-title">最近五场状态</h4>
           <div class="fw-drawer-grid">
             <article v-for="side in [
-              { team: selected.homeTeam, form: selected.homeForm },
-              { team: selected.awayTeam, form: selected.awayForm }
+              { team: displayTeamName(selected.homeTeam), form: selected.homeForm },
+              { team: displayTeamName(selected.awayTeam), form: selected.awayForm }
             ]" :key="side.team" class="fw-form-card">
-              <div class="fw-form-head"><strong>{{ side.team }}</strong><span>Elo {{ side.form.elo.toFixed(0) }}</span></div>
+              <div class="fw-form-head"><strong>{{ side.team }}</strong><span>等级分 {{ side.form.elo.toFixed(0) }}</span></div>
               <div class="fw-form-sequence">
                 <span v-for="(result, index) in formSequence(side.form.sequence)" :key="index" :class="result.className">{{ result.label }}</span>
                 <em v-if="!side.form.matches">暂无赛前样本</em>
