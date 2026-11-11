@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue';
 import { NSelect, NSpin } from 'naive-ui';
 import { fetchFootballMatches } from '@/service/api/football';
 import type { MatchSummary } from '@/utils/football';
+import { useEcharts } from '@/hooks/common/echarts';
+import type { ECOption } from '@/hooks/common/echarts';
 import { useFootballData } from '@/hooks/business/useFootballData';
 import { downloadCsv, summarizeMatches } from '@/utils/football';
 
@@ -39,22 +41,132 @@ async function loadHistory() {
 
 watch([() => seasons.value.length, league, month], loadHistory, { immediate: true });
 const currentMetric = computed(() => summary.value[metric.value]);
-const average = computed(() => history.value.length ? history.value.reduce((sum, item) => sum + item[metric.value], 0) / history.value.length : 0);
-const metricValue = (value: number) => metric.value === 'homeRate' || metric.value === 'over25Rate' ? `${value.toFixed(1)}%` : value.toFixed(2);
-const chartPoints = computed(() => {
-  if (!history.value.length) return [];
-  const values = history.value.map(item => item[metric.value]);
-  const minimum = Math.min(...values, average.value);
-  const maximum = Math.max(...values, average.value);
-  const range = maximum - minimum || 1;
-  return values.map((value, index) => ({
-    label: String(history.value[index].year),
-    value,
-    x: history.value.length === 1 ? 50 : 8 + (index / (history.value.length - 1)) * 84,
-    y: 180 - ((value - minimum) / range) * 145
-  }));
+const average = computed(() =>
+  history.value.length ? history.value.reduce((sum, item) => sum + item[metric.value], 0) / history.value.length : 0
+);
+const isRate = computed(() => metric.value === 'homeRate' || metric.value === 'over25Rate');
+const metricLabel = computed(() => metricOptions.find(item => item.value === metric.value)?.label ?? '');
+const metricValue = (value: number) => (isRate.value ? `${value.toFixed(1)}%` : value.toFixed(2));
+const axisValue = (value: number) => (isRate.value ? `${value.toFixed(0)}%` : value.toFixed(1));
+const delta = computed(() => currentMetric.value - average.value);
+const deltaTone = computed(() => (Math.abs(delta.value) < 0.005 ? 'is-flat' : delta.value > 0 ? 'is-up' : 'is-down'));
+const deltaText = computed(() => {
+  if (Math.abs(delta.value) < 0.005) return '与均值持平';
+  const unit = isRate.value ? ' pp' : '';
+  return `较均值${delta.value > 0 ? '高' : '低'} ${Math.abs(delta.value).toFixed(isRate.value ? 1 : 2)}${unit}`;
 });
-const chartPath = computed(() => chartPoints.value.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' '));
+
+function buildChartOption(): ECOption {
+  const labels = history.value.map(item => item.year);
+  const values = history.value.map(item => item[metric.value]);
+  return {
+    animationDuration: 600,
+    animationEasing: 'cubicOut',
+    grid: { left: 18, right: 24, top: 34, bottom: 6, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#fff',
+      borderColor: '#e2e9e4',
+      borderWidth: 1,
+      padding: [10, 13],
+      textStyle: { color: '#46564e', fontSize: 12 },
+      extraCssText: 'border-radius: 8px; box-shadow: 0 10px 28px rgba(20, 63, 49, 0.12);',
+      valueFormatter: value => metricValue(Number(Array.isArray(value) ? value[0] : value)),
+      axisPointer: { type: 'line', lineStyle: { color: '#178653', width: 1, type: 'dashed' } }
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: labels,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#8b9a91', fontSize: 10, margin: 14, hideOverlap: true }
+    },
+    yAxis: {
+      type: 'value',
+      scale: true,
+      splitNumber: 4,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: {
+        color: '#8b9a91',
+        fontSize: 10,
+        formatter: (value: number | string) => axisValue(Number(value))
+      },
+      splitLine: { lineStyle: { color: '#e7ede9', type: 'dashed' } }
+    },
+    series: [
+      {
+        name: metricLabel.value,
+        type: 'line',
+        smooth: 0.35,
+        symbol: 'circle',
+        symbolSize: 10,
+        clip: false,
+        z: 3,
+        lineStyle: {
+          width: 3,
+          color: '#178653',
+          shadowColor: 'rgba(23, 134, 83, 0.22)',
+          shadowBlur: 12,
+          shadowOffsetY: 7
+        },
+        itemStyle: { color: '#178653', borderColor: '#fff', borderWidth: 2 },
+        emphasis: {
+          focus: 'series',
+          itemStyle: {
+            color: '#116b42',
+            borderColor: '#fff',
+            borderWidth: 2,
+            shadowBlur: 12,
+            shadowColor: 'rgba(23, 134, 83, 0.35)'
+          }
+        },
+        label: {
+          show: true,
+          position: 'top',
+          distance: 12,
+          color: '#15231d',
+          fontSize: 11,
+          fontWeight: 600,
+          formatter: (params: { value: unknown }) => metricValue(Number(params.value))
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(23, 134, 83, 0.22)' },
+              { offset: 1, color: 'rgba(23, 134, 83, 0.01)' }
+            ]
+          }
+        },
+        data: values
+      },
+      {
+        name: '均值参考线',
+        type: 'line',
+        data: labels.map(() => Number(average.value.toFixed(2))),
+        symbol: 'none',
+        silent: true,
+        z: 1,
+        lineStyle: { color: '#b0c1b6', width: 1.5, type: 'dashed' }
+      }
+    ]
+  };
+}
+
+const { domRef, updateOptions } = useEcharts(() => buildChartOption(), {
+  onRender: () => {},
+  onUpdated: () => {}
+});
+
+watch([history, metric], () => {
+  updateOptions(() => buildChartOption());
+});
 
 function exportAnalysis() {
   downloadCsv('football-analysis.csv', [
@@ -83,16 +195,19 @@ function exportAnalysis() {
     <section class="fw-analysis-layout">
       <article class="fw-panel">
         <div class="fw-panel-head fw-chart-head"><div><h3>近五赛季趋势</h3><p>{{ leagueOptions.find(item => item.value === league)?.label }} · 同一月份筛选</p></div><label class="fw-field">分析指标<NSelect v-model:value="metric" :options="metricOptions" /></label></div>
-        <NSpin :show="loading || historyLoading"><div class="fw-panel-body">
-          <div class="fw-summary-line"><div><span>所选年度均值</span><strong>{{ metricValue(average) }}</strong></div><span class="fw-tag">当前赛季 {{ metricValue(currentMetric) }}</span></div>
-          <svg v-if="chartPoints.length" class="fw-chart" viewBox="0 0 100 200" preserveAspectRatio="none" role="img" aria-label="年度数据趋势">
-            <line v-for="y in [35, 75, 115, 155, 190]" :key="y" x1="5" x2="95" :y1="y" :y2="y" class="fw-chart-grid" />
-            <path :d="chartPath" class="fw-chart-line" />
-            <circle v-for="point in chartPoints" :key="point.label" :cx="point.x" :cy="point.y" r="1.7" class="fw-chart-dot"><title>{{ point.label }} · {{ metricValue(point.value) }}</title></circle>
-          </svg>
-          <div v-if="chartPoints.length" class="fw-chart-labels"><span v-for="point in chartPoints" :key="point.label">{{ point.label }}</span></div>
-          <div v-else class="fw-empty"><strong>当前赛季没有可汇总的完赛数据</strong><span>请调整月份或选择其他赛季</span></div>
-        </div></NSpin>
+        <NSpin :show="loading || historyLoading">
+          <div class="fw-panel-body">
+            <div class="fw-chart-summary">
+              <div class="fw-chart-summary-main"><span>近 {{ history.length }} 季均值 · {{ metricLabel }}</span><strong>{{ metricValue(average) }}</strong></div>
+              <div class="fw-chart-summary-side"><span class="fw-tag">当前赛季 {{ metricValue(currentMetric) }}</span><span class="fw-delta" :class="deltaTone">{{ deltaText }}</span></div>
+            </div>
+            <div class="fw-chart-legend"><span><i class="fw-legend-line"></i>{{ metricLabel }}</span><span><i class="fw-legend-mean"></i>均值参考线</span></div>
+            <div class="fw-chart-frame">
+              <div ref="domRef" class="fw-chart"></div>
+              <div v-if="!history.length" class="fw-chart-empty"><strong>当前赛季没有可汇总的完赛数据</strong><span>请调整月份或选择其他赛季</span></div>
+            </div>
+          </div>
+        </NSpin>
       </article>
       <section class="fw-analysis-kpis">
         <article class="fw-stat"><span>主胜 / 平 / 客胜</span><strong>{{ summary.homeRate.toFixed(1) }} / {{ summary.drawRate.toFixed(1) }} / {{ summary.awayRate.toFixed(1) }}<small>%</small></strong></article>
@@ -103,7 +218,7 @@ function exportAnalysis() {
     </section>
 
     <section class="fw-panel">
-          <div class="fw-panel-head fw-toolbar"><div><h3>赛季明细</h3><p>最近五个有数据的赛季，同一联赛和月份区间</p></div><button class="fw-button" @click="exportAnalysis">导出 CSV</button></div>
+      <div class="fw-panel-head fw-toolbar"><div><h3>赛季明细</h3><p>最近五个有数据的赛季，同一联赛和月份区间</p></div><button class="fw-button" @click="exportAnalysis">导出 CSV</button></div>
       <div class="fw-table-wrap"><table class="fw-table"><thead><tr><th>年份</th><th>场次</th><th>主胜</th><th>平局</th><th>客胜</th><th>场均进球</th><th>大于 2.5 球</th><th>场均角球</th><th>场均黄牌</th></tr></thead><tbody><tr v-for="item in [...history].reverse()" :key="item.year"><td><strong>{{ item.year }}</strong></td><td>{{ item.games }}</td><td>{{ item.homeRate.toFixed(1) }}%</td><td>{{ item.drawRate.toFixed(1) }}%</td><td>{{ item.awayRate.toFixed(1) }}%</td><td>{{ item.averageGoals.toFixed(2) }}</td><td><strong>{{ item.over25Rate.toFixed(1) }}%</strong></td><td>{{ item.averageCorners.toFixed(1) }}</td><td>{{ item.averageCards.toFixed(1) }}</td></tr></tbody></table></div>
     </section>
   </div>
