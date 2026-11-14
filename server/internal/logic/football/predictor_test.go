@@ -73,6 +73,56 @@ func TestParseCSVDateExpandsTwoDigitYears(t *testing.T) {
 	}
 }
 
+func TestPredictMatchUsesMarketOddsWithoutHistory(t *testing.T) {
+	history := &leagueHistory{}
+	awayFavorite := v1.ImportMatch{
+		Date: "2026-11-14", League: "国际赛", HomeTeam: "日本", AwayTeam: "巴西",
+		HomeOdds: 3.75, DrawOdds: 3.70, AwayOdds: 1.66,
+	}
+	homeFavorite := v1.ImportMatch{
+		Date: "2026-11-14", League: "国际赛", HomeTeam: "葡萄牙", AwayTeam: "丹麦",
+		HomeOdds: 1.45, DrawOdds: 4.10, AwayOdds: 6.20,
+	}
+
+	awayPrediction, err := PredictMatch(history, awayFavorite)
+	if err != nil {
+		t.Fatalf("PredictMatch returned error: %v", err)
+	}
+	homePrediction, err := PredictMatch(history, homeFavorite)
+	if err != nil {
+		t.Fatalf("PredictMatch returned error: %v", err)
+	}
+	if !awayPrediction.MarketUsed || !homePrediction.MarketUsed {
+		t.Fatal("expected both predictions to use market odds")
+	}
+	if awayPrediction.PredictedScore == homePrediction.PredictedScore &&
+		awayPrediction.ExpectedHomeGoals == homePrediction.ExpectedHomeGoals {
+		t.Fatal("different market odds must not produce identical predictions")
+	}
+	if awayPrediction.AwayWinProbability <= awayPrediction.HomeWinProbability {
+		t.Fatalf("away favorite should lean away, got %.1f/%.1f", awayPrediction.HomeWinProbability, awayPrediction.AwayWinProbability)
+	}
+	if homePrediction.HomeWinProbability <= homePrediction.AwayWinProbability {
+		t.Fatalf("home favorite should lean home, got %.1f/%.1f", homePrediction.HomeWinProbability, homePrediction.AwayWinProbability)
+	}
+}
+
+func TestImportedResultsBecomeHistory(t *testing.T) {
+	history := &leagueHistory{matches: []historicalMatch{
+		{date: 20261001, league: "自定义联赛", homeTeam: "raw:甲队", awayTeam: "raw:乙队", homeGoals: 3, awayGoals: 1},
+		{date: 20261008, league: "自定义联赛", homeTeam: "raw:乙队", awayTeam: "raw:甲队", homeGoals: 0, awayGoals: 0},
+	}}
+	prediction, err := PredictMatch(history, v1.ImportMatch{
+		Date: "2026-11-14", League: "自定义联赛", HomeTeam: "甲队", AwayTeam: "乙队",
+	})
+	if err != nil {
+		t.Fatalf("PredictMatch returned error: %v", err)
+	}
+	if prediction.HistoryMatches != 2 || prediction.HomeTeamHistory != 2 || prediction.AwayTeamHistory != 2 {
+		t.Fatalf("imported results should be usable history, got %+v", prediction)
+	}
+}
+
 func TestResolveLeagueCode(t *testing.T) {
 	for input, expected := range map[string]string{
 		"E0":                          "E0",

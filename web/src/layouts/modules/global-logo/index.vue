@@ -39,15 +39,17 @@ withDefaults(defineProps<Props>(), {
   height: 30px;
   flex: 0 0 30px;
   place-items: center;
+  border: 1px solid rgb(255 255 255 / 70%);
   border-radius: 8px;
-  background: #12643d;
+  background: linear-gradient(135deg, #38bdf8, #0d7fa8);
+  box-shadow: 0 4px 12px rgb(13 127 168 / 28%);
   color: #fff;
   font-size: 19px;
 }
 
 .footstat-brand-name {
   overflow: hidden;
-  color: #163c2a;
+  color: #12263a;
   font-size: 14px;
   font-weight: 750;
   text-overflow: ellipsis;

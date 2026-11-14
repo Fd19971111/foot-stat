@@ -29,19 +29,60 @@ type sportteryMatchGroup struct {
 	SubMatchList []sportteryMatch `json:"subMatchList"`
 }
 
+type sportteryOdds struct {
+	H string `json:"h"`
+	D string `json:"d"`
+	A string `json:"a"`
+}
+
 type sportteryMatch struct {
-	BusinessDate    string `json:"businessDate"`
-	MatchDate       string `json:"matchDate"`
-	MatchTime       string `json:"matchTime"`
-	MatchNumStr     string `json:"matchNumStr"`
-	LeagueAbbName   string `json:"leagueAbbName"`
-	LeagueAllName   string `json:"leagueAllName"`
-	HomeTeamAbbName string `json:"homeTeamAbbName"`
-	HomeTeamAllName string `json:"homeTeamAllName"`
-	AwayTeamAbbName string `json:"awayTeamAbbName"`
-	AwayTeamAllName string `json:"awayTeamAllName"`
-	MatchStatus     string `json:"matchStatus"`
-	MatchId         int64  `json:"matchId"`
+	BusinessDate    string         `json:"businessDate"`
+	MatchDate       string         `json:"matchDate"`
+	MatchTime       string         `json:"matchTime"`
+	MatchNumStr     string         `json:"matchNumStr"`
+	LeagueAbbName   string         `json:"leagueAbbName"`
+	LeagueAllName   string         `json:"leagueAllName"`
+	HomeTeamAbbName string         `json:"homeTeamAbbName"`
+	HomeTeamAllName string         `json:"homeTeamAllName"`
+	AwayTeamAbbName string         `json:"awayTeamAbbName"`
+	AwayTeamAllName string         `json:"awayTeamAllName"`
+	MatchStatus     string         `json:"matchStatus"`
+	MatchId         int64          `json:"matchId"`
+	Had             sportteryOdds  `json:"had"`
+	OddsList        []sportteryOdd `json:"oddsList"`
+}
+
+type sportteryOdd struct {
+	H        string `json:"h"`
+	D        string `json:"d"`
+	A        string `json:"a"`
+	PoolCode string `json:"poolCode"`
+}
+
+// parseSportteryOdds 读取竞彩网「胜平负」(HAD) 赔率；优先取 had 字段，缺失时回退到 oddsList。
+func parseSportteryOdds(item sportteryMatch) (home, draw, away float64) {
+	candidate := item.Had
+	if parseSportteryOdd(candidate.H) <= 1 {
+		for _, odd := range item.OddsList {
+			if strings.EqualFold(odd.PoolCode, "HAD") && parseSportteryOdd(odd.H) > 1 {
+				candidate = sportteryOdds{H: odd.H, D: odd.D, A: odd.A}
+				break
+			}
+		}
+	}
+	home, draw, away = parseSportteryOdd(candidate.H), parseSportteryOdd(candidate.D), parseSportteryOdd(candidate.A)
+	if home <= 1 || draw <= 1 || away <= 1 {
+		return 0, 0, 0
+	}
+	return home, draw, away
+}
+
+func parseSportteryOdd(value string) float64 {
+	odds, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || odds <= 1 || odds > 1000 {
+		return 0
+	}
+	return odds
 }
 
 // GetRemoteMatches 拉取中国竞彩网当前在售的足球赛程。
@@ -118,6 +159,7 @@ func parseSportteryMatches(body []byte) ([]v1.RemoteMatch, error) {
 			}
 			seen[key] = true
 
+			homeOdds, drawOdds, awayOdds := parseSportteryOdds(item)
 			matches = append(matches, v1.RemoteMatch{
 				MatchId:  matchId,
 				MatchNum: strings.TrimSpace(item.MatchNumStr),
@@ -127,6 +169,9 @@ func parseSportteryMatches(body []byte) ([]v1.RemoteMatch, error) {
 				HomeTeam: homeTeam,
 				AwayTeam: awayTeam,
 				Status:   item.MatchStatus,
+				HomeOdds: homeOdds,
+				DrawOdds: drawOdds,
+				AwayOdds: awayOdds,
 			})
 		}
 	}

@@ -26,6 +26,13 @@ export interface ImportMatch {
   league: string;
   homeTeam: string;
   awayTeam: string;
+  /** 胜平负赔率，可缺省；系统会自动从竞彩网补齐 */
+  homeOdds?: number;
+  drawOdds?: number;
+  awayOdds?: number;
+  /** 已完赛的全场比分；提供后会进入历史样本池，供后续比赛建模 */
+  homeGoals?: number | null;
+  awayGoals?: number | null;
 }
 
 export interface ImportBatch {
@@ -52,6 +59,8 @@ export interface MatchPrediction {
   homeTeamHistory: number;
   awayTeamHistory: number;
   modelBasis: string;
+  marketUsed: boolean;
+  dataQuality: 'both' | 'market' | 'history' | 'insufficient' | string;
 }
 
 /** 获取可用赛季列表 */
@@ -165,6 +174,9 @@ export interface RemoteMatch {
   homeTeam: string;
   awayTeam: string;
   status: string;
+  homeOdds: number;
+  drawOdds: number;
+  awayOdds: number;
 }
 
 /** 拉取中国竞彩网当前在售赛程 */

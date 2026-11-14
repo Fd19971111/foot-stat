@@ -60,11 +60,16 @@ type GetMatchesRes struct {
 }
 
 type ImportMatch struct {
-	Date     string `json:"date" v:"required#比赛日期不能为空"`
-	Time     string `json:"time"`
-	League   string `json:"league" v:"required#联赛不能为空"`
-	HomeTeam string `json:"homeTeam" v:"required#主队不能为空"`
-	AwayTeam string `json:"awayTeam" v:"required#客队不能为空"`
+	Date      string  `json:"date" v:"required#比赛日期不能为空"`
+	Time      string  `json:"time"`
+	League    string  `json:"league" v:"required#联赛不能为空"`
+	HomeTeam  string  `json:"homeTeam" v:"required#主队不能为空"`
+	AwayTeam  string  `json:"awayTeam" v:"required#客队不能为空"`
+	HomeOdds  float64 `json:"homeOdds"`  // 主胜赔率，0 表示未提供
+	DrawOdds  float64 `json:"drawOdds"`  // 平局赔率，0 表示未提供
+	AwayOdds  float64 `json:"awayOdds"`  // 客胜赔率，0 表示未提供
+	HomeGoals *int    `json:"homeGoals"` // 已完赛的全场主队进球，nil 表示未完赛
+	AwayGoals *int    `json:"awayGoals"` // 已完赛的全场客队进球，nil 表示未完赛
 }
 
 type GetRemoteMatchesReq struct {
@@ -77,9 +82,12 @@ type RemoteMatch struct {
 	Date     string `json:"date"`     // 比赛日期
 	Time     string `json:"time"`     // 开赛时间
 	League   string `json:"league"`
-	HomeTeam string `json:"homeTeam"`
-	AwayTeam string `json:"awayTeam"`
-	Status   string `json:"status"`
+	HomeTeam string  `json:"homeTeam"`
+	AwayTeam string  `json:"awayTeam"`
+	Status   string  `json:"status"`
+	HomeOdds float64 `json:"homeOdds"`
+	DrawOdds float64 `json:"drawOdds"`
+	AwayOdds float64 `json:"awayOdds"`
 }
 
 type GetRemoteMatchesRes struct {
@@ -118,6 +126,8 @@ type MatchPrediction struct {
 	HomeTeamHistory    int     `json:"homeTeamHistory"`
 	AwayTeamHistory    int     `json:"awayTeamHistory"`
 	ModelBasis         string  `json:"modelBasis"`
+	MarketUsed         bool    `json:"marketUsed"`
+	DataQuality        string  `json:"dataQuality"`
 }
 
 type CreateImportRes struct {

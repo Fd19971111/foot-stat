@@ -13,6 +13,7 @@ import (
 
 type historicalMatch struct {
 	date      int
+	league    string
 	homeTeam  string
 	awayTeam  string
 	homeGoals float64
@@ -54,6 +55,16 @@ var leagueAliases = map[string]string{
 	"葡超": "P1", "葡萄牙超级联赛": "P1",
 	"土超": "T1", "土耳其超级联赛": "T1",
 	"希超": "G1", "希腊超级联赛": "G1",
+	// 竞彩网常见简称：即使 data 目录没有对应 CSV，也能给出明确的联赛标识，
+	// 预测本身由赔率 + 用户导入的历史赛果驱动。
+	"巴甲": "BRA", "巴西甲级联赛": "BRA", "巴西甲": "BRA",
+	"阿甲": "ARG", "阿根廷甲级联赛": "ARG",
+	"日职": "JPN", "日职联": "JPN", "日本职业联赛": "JPN",
+	"韩职": "KOR", "韩k联": "KOR", "韩国职业联赛": "KOR",
+	"中超": "CHN", "中国超级联赛": "CHN",
+	"美职": "USA", "美职联": "USA", "美国职业大联盟": "USA",
+	"英格兰全国联赛": "EC",
+	"苏冠": "SC1", "苏格兰冠军联赛": "SC1",
 }
 
 func resolveLeagueCode(value string) string {
@@ -83,6 +94,10 @@ func loadLeagueHistory(ctx context.Context, league string) (*leagueHistory, erro
 	code := resolveLeagueCode(league)
 	history := &leagueHistory{code: code, matches: make([]historicalMatch, 0)}
 	if code == "" {
+		return history, nil
+	}
+	// data 目录里没有该联赛文件时直接返回，避免逐赛季尝试打开并刷屏告警。
+	if files, globErr := filepath.Glob(filepath.Join(DataDir(), "*", code+".csv")); globErr != nil || len(files) == 0 {
 		return history, nil
 	}
 
@@ -266,6 +281,16 @@ func PredictMatch(history *leagueHistory, match v1.ImportMatch) (v1.MatchPredict
 	expectedHome := clamp(leagueHomeMean*attackHome*defenseAway, 0.15, 4.5)
 	expectedAway := clamp(leagueAwayMean*attackAway*defenseHome, 0.1, 4.0)
 
+	// 无联赛历史或球队名未匹配时，历史模型会退化成常量；用市场赔率反推期望进球，
+	// 保证每场比赛的比分、概率都随对阵双方真实变化，而不是整批输出同一个结果。
+	market, hasMarket := marketProbabilitySet(match)
+	if hasMarket {
+		fittedHome, fittedAway := calibrateLambdas(market, expectedHome, expectedAway)
+		weight := marketWeight(historyMatches)
+		expectedHome = clamp((1-weight)*expectedHome+weight*fittedHome, 0.15, 4.5)
+		expectedAway = clamp((1-weight)*expectedAway+weight*fittedAway, 0.1, 4.0)
+	}
+
 	homeProbabilities := poissonProbabilities(expectedHome, 10)
 	awayProbabilities := poissonProbabilities(expectedAway, 10)
 	var homeWin, draw, awayWin, over25, total float64
@@ -298,17 +323,36 @@ func PredictMatch(history *leagueHistory, match v1.ImportMatch) (v1.MatchPredict
 		over25 /= total
 	}
 
-	modelBasis := fmt.Sprintf("%s 联赛历史 %d 场", history.code, historyMatches)
 	homeTeamHistory := teamHistoryCount(homeStats)
 	awayTeamHistory := teamHistoryCount(awayStats)
-	if history.code == "" {
+	oddsNote := fmt.Sprintf("竞彩赔率校准（主 %.2f / 平 %.2f / 客 %.2f）", match.HomeOdds, match.DrawOdds, match.AwayOdds)
+	var modelBasis string
+	switch {
+	case history.code == "" && !hasMarket:
 		modelBasis = "未匹配到联赛历史，使用通用进球先验"
-	} else if historyMatches == 0 {
+	case history.code == "" && hasMarket:
+		modelBasis = fmt.Sprintf("未匹配联赛历史，自定义赛果样本 %d 场，%s", historyMatches, oddsNote)
+	case historyMatches == 0 && hasMarket:
+		modelBasis = fmt.Sprintf("%s 暂无赛前历史样本，%s", history.code, oddsNote)
+	case historyMatches == 0:
 		modelBasis = fmt.Sprintf("%s 暂无赛前历史样本，使用通用进球先验", history.code)
-	} else if homeStats == nil || awayStats == nil {
-		modelBasis += "；球队名未匹配，按联赛基准估算"
-	} else {
-		modelBasis += fmt.Sprintf("；主队样本 %d 场，客队样本 %d 场", homeTeamHistory, awayTeamHistory)
+	case homeStats == nil || awayStats == nil:
+		modelBasis = fmt.Sprintf("%s 联赛历史 %d 场；球队名未匹配，按联赛基准估算", history.code, historyMatches)
+	default:
+		modelBasis = fmt.Sprintf("%s 联赛历史 %d 场；主队样本 %d 场，客队样本 %d 场", history.code, historyMatches, homeTeamHistory, awayTeamHistory)
+	}
+	if hasMarket && historyMatches > 0 {
+		modelBasis += "；叠加" + oddsNote
+	}
+
+	dataQuality := "insufficient"
+	switch {
+	case hasMarket && historyMatches > 0:
+		dataQuality = "both"
+	case hasMarket:
+		dataQuality = "market"
+	case historyMatches > 0 && homeTeamHistory > 0 && awayTeamHistory > 0:
+		dataQuality = "history"
 	}
 
 	return v1.MatchPrediction{
@@ -317,7 +361,7 @@ func PredictMatch(history *leagueHistory, match v1.ImportMatch) (v1.MatchPredict
 		HomeWinProbability: round(homeWin*100, 1), DrawProbability: round(draw*100, 1), AwayWinProbability: round(awayWin*100, 1),
 		Over25Probability: round(over25*100, 1), HistoryMatches: historyMatches,
 		HomeTeamHistory: homeTeamHistory, AwayTeamHistory: awayTeamHistory,
-		ModelBasis: modelBasis,
+		ModelBasis: modelBasis, MarketUsed: hasMarket, DataQuality: dataQuality,
 	}, nil
 }
 

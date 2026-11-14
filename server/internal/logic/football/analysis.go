@@ -84,23 +84,34 @@ func AnalyzeImport(ctx context.Context, id int64) (*v1.GetAnalysisRes, error) {
 		return nil, fmt.Errorf("读取导入批次失败: %w", err)
 	}
 
-	rows, err := db.QueryContext(ctx, `SELECT match_date, kickoff_time, league, home_team, away_team
+	rows, err := db.QueryContext(ctx, `SELECT match_date, kickoff_time, league, home_team, away_team,
+		COALESCE(home_odds, 0), COALESCE(draw_odds, 0), COALESCE(away_odds, 0)
 		FROM footstat_import_matches WHERE batch_id = ? ORDER BY match_date, id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("读取导入比赛失败: %w", err)
 	}
-	defer rows.Close()
 
 	matches := make([]v1.ImportMatch, 0, batch.MatchCount)
 	for rows.Next() {
 		var match v1.ImportMatch
-		if err = rows.Scan(&match.Date, &match.Time, &match.League, &match.HomeTeam, &match.AwayTeam); err != nil {
+		if err = rows.Scan(&match.Date, &match.Time, &match.League, &match.HomeTeam, &match.AwayTeam,
+			&match.HomeOdds, &match.DrawOdds, &match.AwayOdds); err != nil {
+			rows.Close()
 			return nil, fmt.Errorf("解析导入比赛失败: %w", err)
 		}
 		matches = append(matches, match)
 	}
 	if err = rows.Err(); err != nil {
+		rows.Close()
 		return nil, fmt.Errorf("遍历导入比赛失败: %w", err)
+	}
+	rows.Close()
+
+	filled := enrichOddsFromRemote(ctx, matches)
+	persistEnrichedOdds(ctx, db, id, matches, filled)
+	importedHistory, err := loadImportHistory(ctx, db)
+	if err != nil {
+		return nil, err
 	}
 
 	type leagueCache struct {
@@ -127,6 +138,8 @@ func AnalyzeImport(ctx context.Context, id int64) (*v1.GetAnalysisRes, error) {
 			if loadErr != nil {
 				return nil, fmt.Errorf("加载 %s 历史数据失败: %w", match.League, loadErr)
 			}
+			history.matches = append(history.matches,
+				importHistoryForLeague(importedHistory, match.League, resolveLeagueCode(match.League))...)
 			sort.Slice(history.matches, func(i, j int) bool {
 				return history.matches[i].date < history.matches[j].date
 			})
@@ -159,7 +172,7 @@ func AnalyzeImport(ctx context.Context, id int64) (*v1.GetAnalysisRes, error) {
 		HighConfidence: highConfidence,
 		HomeLean:       homeLean,
 		OverLean:       overLean,
-		Algorithm:      "Dixon-Coles 泊松模型 + Elo 等级分 + 近期状态",
+		Algorithm:      "Dixon-Coles 泊松模型 + Elo 等级分 + 近期状态 + 赔率校准",
 	}
 	if len(results) > 0 {
 		summary.AverageConfidence = round(totalConfidence/float64(len(results)), 0)
@@ -306,6 +319,15 @@ func analyzeMatch(snapshot *leagueSnapshot, match v1.ImportMatch) v1.MatchAnalys
 	expectedHome := clamp(snapshot.homeMean*homeAttack*awayDefense, 0.15, 4.5)
 	expectedAway := clamp(snapshot.awayMean*awayAttack*homeDefense, 0.1, 4.0)
 
+	// 无历史样本时模型会收敛到联赛常量，用竞彩赔率反推期望进球，保证逐场结果有区分度。
+	market, hasMarket := marketProbabilitySet(match)
+	if hasMarket {
+		fittedHome, fittedAway := calibrateLambdas(market, expectedHome, expectedAway)
+		weight := marketWeight(snapshot.matches)
+		expectedHome = clamp((1-weight)*expectedHome+weight*fittedHome, 0.15, 4.5)
+		expectedAway = clamp((1-weight)*expectedAway+weight*fittedAway, 0.1, 4.0)
+	}
+
 	poissonResult := poissonOutcome(expectedHome, expectedAway)
 	homeElo := ratingOf(snapshot.ratings, homeKey)
 	awayElo := ratingOf(snapshot.ratings, awayKey)
@@ -317,6 +339,13 @@ func analyzeMatch(snapshot *leagueSnapshot, match v1.ImportMatch) v1.MatchAnalys
 		away: 0.65*poissonResult.away + 0.35*eloResult.away,
 	}
 	final = normalize(final)
+	if hasMarket {
+		final = normalize(probabilitySet{
+			home: 0.8*final.home + 0.2*market.home,
+			draw: 0.8*final.draw + 0.2*market.draw,
+			away: 0.8*final.away + 0.2*market.away,
+		})
+	}
 
 	confidence := analysisConfidence(snapshot, homeStats, awayStats, final, poissonResult.probabilitySet, eloResult)
 	recommendationType, recommendation := recommendationOf(final)
@@ -329,7 +358,7 @@ func analyzeMatch(snapshot *leagueSnapshot, match v1.ImportMatch) v1.MatchAnalys
 		bttsAdvice = "双方进球"
 	}
 
-	return v1.MatchAnalysis{
+	result := v1.MatchAnalysis{
 		MatchDate:         match.Date,
 		KickoffTime:       match.Time,
 		League:            match.League,
@@ -363,6 +392,11 @@ func analyzeMatch(snapshot *leagueSnapshot, match v1.ImportMatch) v1.MatchAnalys
 		ScoreLines:         poissonResult.scoreLines,
 		ModelBasis:         modelBasis(snapshot, homeStats, awayStats),
 	}
+	if hasMarket {
+		result.ModelBasis += fmt.Sprintf("；竞彩赔率校准（主 %.2f / 平 %.2f / 客 %.2f）",
+			match.HomeOdds, match.DrawOdds, match.AwayOdds)
+	}
+	return result
 }
 
 func attackRate(stats *weightedTeamStats, atHome bool, leagueMean float64) float64 {

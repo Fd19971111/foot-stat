@@ -4,11 +4,11 @@ export const themeSettings: App.Theme.ThemeSetting = {
   grayscale: false,
   colourWeakness: false,
   recommendColor: false,
-  themeColor: '#167448',
+  themeColor: '#0d7fa8',
   themeRadius: 6,
   otherColor: {
-    info: '#2874a5',
-    success: '#25814f',
+    info: '#0e86b8',
+    success: '#159a9c',
     warning: '#b67a20',
     error: '#b94a48'
   },
@@ -68,14 +68,14 @@ export const themeSettings: App.Theme.ThemeSetting = {
     light: {
       colors: {
         container: 'rgb(255, 255, 255)',
-        layout: 'rgb(245, 248, 245)',
-        inverted: 'rgb(18, 54, 38)',
-        'base-text': 'rgb(21, 35, 29)'
+        layout: 'rgb(243, 248, 254)',
+        inverted: 'rgb(18, 44, 74)',
+        'base-text': 'rgb(18, 38, 58)'
       },
       boxShadow: {
-        header: '0 1px 2px rgb(18, 54, 38, 0.08)',
-        sider: '2px 0 8px 0 rgb(18, 54, 38, 0.06)',
-        tab: '0 1px 2px rgb(18, 54, 38, 0.06)'
+        header: '0 1px 2px rgb(22, 62, 105, 0.08)',
+        sider: '2px 0 8px 0 rgb(22, 62, 105, 0.06)',
+        tab: '0 1px 2px rgb(22, 62, 105, 0.06)'
       }
     },
     dark: {
@@ -93,4 +93,27 @@ export const themeSettings: App.Theme.ThemeSetting = {
  *
  * If publish new version, use `overrideThemeSettings` to override certain theme settings
  */
-export const overrideThemeSettings: Partial<App.Theme.ThemeSetting> = {};
+export const overrideThemeSettings: Partial<App.Theme.ThemeSetting> = {
+  themeColor: '#0d7fa8',
+  otherColor: {
+    info: '#0e86b8',
+    success: '#159a9c',
+    warning: '#b67a20',
+    error: '#b94a48'
+  },
+  tokens: {
+    light: {
+      colors: {
+        container: 'rgb(255, 255, 255)',
+        layout: 'rgb(243, 248, 254)',
+        inverted: 'rgb(18, 44, 74)',
+        'base-text': 'rgb(18, 38, 58)'
+      },
+      boxShadow: {
+        header: '0 1px 2px rgb(22, 62, 105, 0.08)',
+        sider: '2px 0 8px 0 rgb(22, 62, 105, 0.06)',
+        tab: '0 1px 2px rgb(22, 62, 105, 0.06)'
+      }
+    }
+  }
+};

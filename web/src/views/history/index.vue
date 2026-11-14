@@ -65,14 +65,14 @@ function buildChartOption(): ECOption {
     grid: { left: 18, right: 24, top: 34, bottom: 6, containLabel: true },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#fff',
-      borderColor: '#e2e9e4',
+      backgroundColor: 'rgba(255, 255, 255, 0.92)',
+      borderColor: '#dbe7f2',
       borderWidth: 1,
       padding: [10, 13],
-      textStyle: { color: '#46564e', fontSize: 12 },
-      extraCssText: 'border-radius: 8px; box-shadow: 0 10px 28px rgba(20, 63, 49, 0.12);',
+      textStyle: { color: '#3d5468', fontSize: 12 },
+      extraCssText: 'border-radius: 8px; backdrop-filter: blur(10px); box-shadow: 0 10px 28px rgba(22, 62, 105, 0.14);',
       valueFormatter: value => metricValue(Number(Array.isArray(value) ? value[0] : value)),
-      axisPointer: { type: 'line', lineStyle: { color: '#178653', width: 1, type: 'dashed' } }
+      axisPointer: { type: 'line', lineStyle: { color: '#0d7fa8', width: 1, type: 'dashed' } }
     },
     xAxis: {
       type: 'category',
@@ -80,7 +80,7 @@ function buildChartOption(): ECOption {
       data: labels,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#8b9a91', fontSize: 10, margin: 14, hideOverlap: true }
+      axisLabel: { color: '#7089a0', fontSize: 10, margin: 14, hideOverlap: true }
     },
     yAxis: {
       type: 'value',
@@ -89,11 +89,11 @@ function buildChartOption(): ECOption {
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: {
-        color: '#8b9a91',
+        color: '#7089a0',
         fontSize: 10,
         formatter: (value: number | string) => axisValue(Number(value))
       },
-      splitLine: { lineStyle: { color: '#e7ede9', type: 'dashed' } }
+      splitLine: { lineStyle: { color: '#e2ecf6', type: 'dashed' } }
     },
     series: [
       {
@@ -106,27 +106,27 @@ function buildChartOption(): ECOption {
         z: 3,
         lineStyle: {
           width: 3,
-          color: '#178653',
-          shadowColor: 'rgba(23, 134, 83, 0.22)',
+          color: '#0d7fa8',
+          shadowColor: 'rgba(13, 127, 168, 0.22)',
           shadowBlur: 12,
           shadowOffsetY: 7
         },
-        itemStyle: { color: '#178653', borderColor: '#fff', borderWidth: 2 },
+        itemStyle: { color: '#38bdf8', borderColor: '#fff', borderWidth: 2 },
         emphasis: {
           focus: 'series',
           itemStyle: {
-            color: '#116b42',
+            color: '#0a6285',
             borderColor: '#fff',
             borderWidth: 2,
             shadowBlur: 12,
-            shadowColor: 'rgba(23, 134, 83, 0.35)'
+            shadowColor: 'rgba(13, 127, 168, 0.35)'
           }
         },
         label: {
           show: true,
           position: 'top',
           distance: 12,
-          color: '#15231d',
+          color: '#12263a',
           fontSize: 11,
           fontWeight: 600,
           formatter: (params: { value: unknown }) => metricValue(Number(params.value))
@@ -139,8 +139,8 @@ function buildChartOption(): ECOption {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(23, 134, 83, 0.22)' },
-              { offset: 1, color: 'rgba(23, 134, 83, 0.01)' }
+              { offset: 0, color: 'rgba(56, 189, 248, 0.28)' },
+              { offset: 1, color: 'rgba(56, 189, 248, 0.01)' }
             ]
           }
         },
@@ -153,7 +153,7 @@ function buildChartOption(): ECOption {
         symbol: 'none',
         silent: true,
         z: 1,
-        lineStyle: { color: '#b0c1b6', width: 1.5, type: 'dashed' }
+        lineStyle: { color: '#a9bfd4', width: 1.5, type: 'dashed' }
       }
     ]
   };

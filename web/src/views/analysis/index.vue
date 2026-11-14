@@ -154,7 +154,7 @@ onMounted(loadBatches);
         <div class="fw-hero-copy">
           <span>综合分析报告 · {{ summary?.algorithm ?? 'Dixon-Coles 泊松 + Elo' }}</span>
           <h2>{{ batches.find(item => item.id === batchId)?.fileName ?? '选择导入批次' }}</h2>
-          <p>概率由历史赛果推算，仅供数据分析参考；样本越充分，信心越高。</p>
+          <p>由历史赛果与胜平负赔率共同推算，仅供数据分析参考；历史样本越充分，信心越高。</p>
         </div>
         <div class="fw-hero-stats">
           <div><span>分析场次</span><strong>{{ summary?.matchCount ?? 0 }}</strong></div>
